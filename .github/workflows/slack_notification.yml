@@ -1,0 +1,170 @@
+name: Slack Notification
+
+on:
+  workflow_run:
+    workflows: [ "JMeter Performance Tests" ]
+    types: [ completed ]
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Workflow Run Results
+        id: results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner:  context.repo.owner,
+              repo:   context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+
+            // Extract outputs from the performance-test job steps
+            const jobData = {};
+            for (const job of jobs.data.jobs) {
+              if (job.name === 'performance-test') {
+                for (const step of job.steps) {
+                  jobData[step.name] = step.conclusion;
+                }
+              }
+            }
+
+            core.setOutput('run_id',     run.data.id);
+            core.setOutput('run_number', run.data.run_number);
+            core.setOutput('run_url',    run.data.html_url);
+            core.setOutput('conclusion', run.data.conclusion);
+            core.setOutput('branch',     run.data.head_branch);
+            core.setOutput('actor',      run.data.triggering_actor?.login || 'unknown');
+            core.setOutput('commit_msg', run.data.head_commit?.message?.split('\n')[0] || '');
+            core.setOutput('commit_sha', run.data.head_sha?.substring(0, 7) || '');
+
+      - name: Send Slack Notification
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CONCLUSION:    ${{ steps.results.outputs.conclusion }}
+          RUN_NUMBER:    ${{ steps.results.outputs.run_number }}
+          RUN_URL:       ${{ steps.results.outputs.run_url }}
+          BRANCH:        ${{ steps.results.outputs.branch }}
+          ACTOR:         ${{ steps.results.outputs.actor }}
+          COMMIT_MSG:    ${{ steps.results.outputs.commit_msg }}
+          COMMIT_SHA:    ${{ steps.results.outputs.commit_sha }}
+          REPO:          ${{ github.repository }}
+        run: |
+          # ── Determine colour and icon based on conclusion ──
+          if [ "$CONCLUSION" = "success" ]; then
+            COLOR="#1a7f37"
+            ICON=":white_check_mark:"
+            TITLE="Performance Tests Passed"
+            SUMMARY="All SLA thresholds were met. Baseline and medium load tests completed successfully."
+          elif [ "$CONCLUSION" = "failure" ]; then
+            COLOR="#cf222e"
+            ICON=":x:"
+            TITLE="Performance Tests Failed"
+            SUMMARY="One or more test phases did not meet SLA thresholds. Review the HTML reports for details."
+          else
+            COLOR="#9a6700"
+            ICON=":warning:"
+            TITLE="Performance Tests — $CONCLUSION"
+            SUMMARY="The workflow completed with status: $CONCLUSION. Check the Actions tab for details."
+          fi
+
+          # ── Build and send Slack Block Kit payload ──
+          python3 << PYEOF
+          import json, os, urllib.request, urllib.error
+
+          webhook   = os.environ["SLACK_WEBHOOK"]
+          color     = os.environ["COLOR"]
+          icon      = os.environ["ICON"]
+          title     = os.environ["TITLE"]
+          summary   = os.environ["SUMMARY"]
+          run_num   = os.environ["RUN_NUMBER"]
+          run_url   = os.environ["RUN_URL"]
+          branch    = os.environ["BRANCH"]
+          actor     = os.environ["ACTOR"]
+          commit    = os.environ["COMMIT_MSG"]
+          sha       = os.environ["COMMIT_SHA"]
+          repo      = os.environ["REPO"]
+
+          payload = {
+            "attachments": [
+              {
+                "color": color,
+                "fallback": f"{icon} DemoBlaze — {title} (Run #{run_num})",
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": f"{icon}  DemoBlaze — {title}"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": summary
+                    }
+                  },
+                  { "type": "divider" },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": f"*Run Number*\n#{run_num}" },
+                      { "type": "mrkdwn", "text": f"*Branch*\n`{branch}`" },
+                      { "type": "mrkdwn", "text": f"*Triggered By*\n{actor}" },
+                      { "type": "mrkdwn", "text": f"*Commit*\n`{sha}` {commit[:50]}" }
+                    ]
+                  },
+                  { "type": "divider" },
+                  {
+                    "type": "context",
+                    "elements": [
+                      {
+                        "type": "mrkdwn",
+                        "text": f":link: <{run_url}|View Full Run & Download HTML Reports>  |  :file_folder: {repo}"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "actions",
+                    "elements": [
+                      {
+                        "type": "button",
+                        "text": { "type": "plain_text", "text": "Open GitHub Actions Run" },
+                        "style": "primary",
+                        "url": run_url
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+
+          data = json.dumps(payload).encode("utf-8")
+          req  = urllib.request.Request(
+                     webhook,
+                     data=data,
+                     headers={"Content-Type": "application/json"},
+                     method="POST"
+                 )
+
+          try:
+              with urllib.request.urlopen(req, timeout=10) as resp:
+                  print(f"Slack notification sent — HTTP {resp.status}")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              print(f"Slack HTTP error {e.code}: {body}")
+              raise
+          except Exception as e:
+              print(f"Slack error: {e}")
+              raise
+          PYEOF
