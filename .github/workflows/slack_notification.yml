@@ -3,164 +3,138 @@ name: Slack Notification
 on:
   workflow_call:
     inputs:
-      overall_status:     { required: true, type: string }
-      run_number:         { required: true, type: string }
-      run_url:            { required: true, type: string }
-      branch:             { required: true, type: string }
-      actor:              { required: true, type: string }
-      repo:               { required: true, type: string }
-      baseline_samples:   { required: true, type: string }
-      baseline_errors:    { required: true, type: string }
-      baseline_error_pct: { required: true, type: string }
-      baseline_avg_rt:    { required: true, type: string }
-      baseline_p90:       { required: true, type: string }
-      baseline_status:    { required: true, type: string }
-      medium_samples:     { required: true, type: string }
-      medium_errors:      { required: true, type: string }
-      medium_error_pct:   { required: true, type: string }
-      medium_avg_rt:      { required: true, type: string }
-      medium_status:      { required: true, type: string }
-      stress_samples:     { required: true, type: string }
-      stress_errors:      { required: true, type: string }
-      stress_error_pct:   { required: true, type: string }
-      stress_avg_rt:      { required: true, type: string }
-      stress_status:      { required: true, type: string }
+      overall_status:      { required: true, type: string }
+      run_number:          { required: true, type: string }
+      run_url:             { required: true, type: string }
+      branch:              { required: true, type: string }
+      actor:               { required: true, type: string }
+      repo:                { required: true, type: string }
+      baseline_samples:    { required: true, type: string }
+      baseline_errors:     { required: true, type: string }
+      baseline_error_pct:  { required: true, type: string }
+      baseline_avg_rt:     { required: true, type: string }
+      baseline_p90:        { required: true, type: string }
+      baseline_status:     { required: true, type: string }
+      medium_samples:      { required: true, type: string }
+      medium_errors:       { required: true, type: string }
+      medium_error_pct:    { required: true, type: string }
+      medium_avg_rt:       { required: true, type: string }
+      medium_status:       { required: true, type: string }
+      peak_samples:        { required: true, type: string }
+      peak_errors:         { required: true, type: string }
+      peak_error_pct:      { required: true, type: string }
+      peak_avg_rt:         { required: true, type: string }
+      peak_status:         { required: true, type: string }
+      stress_samples:      { required: true, type: string }
+      stress_errors:       { required: true, type: string }
+      stress_error_pct:    { required: true, type: string }
+      stress_avg_rt:       { required: true, type: string }
+      stress_status:       { required: true, type: string }
+      endurance_samples:   { required: true, type: string }
+      endurance_errors:    { required: true, type: string }
+      endurance_error_pct: { required: true, type: string }
+      endurance_avg_rt:    { required: true, type: string }
+      endurance_status:    { required: true, type: string }
     secrets:
-      SLACK_WEBHOOK_URL:  { required: true }
+      SLACK_WEBHOOK_URL: { required: true }
 
 jobs:
   notify-slack:
     runs-on: ubuntu-latest
-
     steps:
       - name: Send Slack Notification
         env:
-          SLACK_WEBHOOK:      ${{ secrets.SLACK_WEBHOOK_URL }}
-          OVERALL:            ${{ inputs.overall_status }}
-          RUN_NUMBER:         ${{ inputs.run_number }}
-          RUN_URL:            ${{ inputs.run_url }}
-          BRANCH:             ${{ inputs.branch }}
-          ACTOR:              ${{ inputs.actor }}
-          REPO:               ${{ inputs.repo }}
-          B_SAMPLES:          ${{ inputs.baseline_samples }}
-          B_ERRORS:           ${{ inputs.baseline_errors }}
-          B_ERROR_PCT:        ${{ inputs.baseline_error_pct }}
-          B_AVG_RT:           ${{ inputs.baseline_avg_rt }}
-          B_P90:              ${{ inputs.baseline_p90 }}
-          B_STATUS:           ${{ inputs.baseline_status }}
-          M_SAMPLES:          ${{ inputs.medium_samples }}
-          M_ERRORS:           ${{ inputs.medium_errors }}
-          M_ERROR_PCT:        ${{ inputs.medium_error_pct }}
-          M_AVG_RT:           ${{ inputs.medium_avg_rt }}
-          M_STATUS:           ${{ inputs.medium_status }}
-          S_SAMPLES:          ${{ inputs.stress_samples }}
-          S_ERRORS:           ${{ inputs.stress_errors }}
-          S_ERROR_PCT:        ${{ inputs.stress_error_pct }}
-          S_AVG_RT:           ${{ inputs.stress_avg_rt }}
-          S_STATUS:           ${{ inputs.stress_status }}
+          SLACK_WEBHOOK:       ${{ secrets.SLACK_WEBHOOK_URL }}
+          OVERALL:             ${{ inputs.overall_status }}
+          RUN_NUMBER:          ${{ inputs.run_number }}
+          RUN_URL:             ${{ inputs.run_url }}
+          BRANCH:              ${{ inputs.branch }}
+          ACTOR:               ${{ inputs.actor }}
+          REPO:                ${{ inputs.repo }}
+          B_SAMPLES:           ${{ inputs.baseline_samples }}
+          B_ERRORS:            ${{ inputs.baseline_errors }}
+          B_ERROR_PCT:         ${{ inputs.baseline_error_pct }}
+          B_AVG_RT:            ${{ inputs.baseline_avg_rt }}
+          B_P90:               ${{ inputs.baseline_p90 }}
+          B_STATUS:            ${{ inputs.baseline_status }}
+          M_SAMPLES:           ${{ inputs.medium_samples }}
+          M_ERRORS:            ${{ inputs.medium_errors }}
+          M_ERROR_PCT:         ${{ inputs.medium_error_pct }}
+          M_AVG_RT:            ${{ inputs.medium_avg_rt }}
+          M_STATUS:            ${{ inputs.medium_status }}
+          P_SAMPLES:           ${{ inputs.peak_samples }}
+          P_ERRORS:            ${{ inputs.peak_errors }}
+          P_ERROR_PCT:         ${{ inputs.peak_error_pct }}
+          P_AVG_RT:            ${{ inputs.peak_avg_rt }}
+          P_STATUS:            ${{ inputs.peak_status }}
+          S_SAMPLES:           ${{ inputs.stress_samples }}
+          S_ERRORS:            ${{ inputs.stress_errors }}
+          S_ERROR_PCT:         ${{ inputs.stress_error_pct }}
+          S_AVG_RT:            ${{ inputs.stress_avg_rt }}
+          S_STATUS:            ${{ inputs.stress_status }}
+          E_SAMPLES:           ${{ inputs.endurance_samples }}
+          E_ERRORS:            ${{ inputs.endurance_errors }}
+          E_ERROR_PCT:         ${{ inputs.endurance_error_pct }}
+          E_AVG_RT:            ${{ inputs.endurance_avg_rt }}
+          E_STATUS:            ${{ inputs.endurance_status }}
         run: |
           python3 << 'PYEOF'
           import json, os, sys, urllib.request, urllib.error
 
-          webhook  = os.environ.get("SLACK_WEBHOOK", "")
-          overall  = os.environ.get("OVERALL",     "ERROR")
-          run_num  = os.environ.get("RUN_NUMBER",  "?")
-          run_url  = os.environ.get("RUN_URL",     "#")
-          branch   = os.environ.get("BRANCH",      "main")
-          actor    = os.environ.get("ACTOR",       "unknown")
-          repo     = os.environ.get("REPO",        "")
-          b_samples  = os.environ.get("B_SAMPLES",   "0")
-          b_errors   = os.environ.get("B_ERRORS",    "0")
-          b_epct     = os.environ.get("B_ERROR_PCT", "0")
-          b_avg      = os.environ.get("B_AVG_RT",    "0")
-          b_p90      = os.environ.get("B_P90",       "0")
-          b_status   = os.environ.get("B_STATUS",    "ERROR")
-          m_samples  = os.environ.get("M_SAMPLES",   "0")
-          m_errors   = os.environ.get("M_ERRORS",    "0")
-          m_epct     = os.environ.get("M_ERROR_PCT", "0")
-          m_avg      = os.environ.get("M_AVG_RT",    "0")
-          m_status   = os.environ.get("M_STATUS",    "ERROR")
-          s_samples  = os.environ.get("S_SAMPLES",   "0")
-          s_errors   = os.environ.get("S_ERRORS",    "0")
-          s_epct     = os.environ.get("S_ERROR_PCT", "0")
-          s_avg      = os.environ.get("S_AVG_RT",    "0")
-          s_status   = os.environ.get("S_STATUS",    "ERROR")
-
+          webhook = os.environ.get("SLACK_WEBHOOK","")
           if not webhook:
-              print("SLACK_WEBHOOK_URL not set — skipping")
-              sys.exit(0)
+              print("SLACK_WEBHOOK_URL not set — skipping"); sys.exit(0)
 
-          def icon(s):
-              return ":white_check_mark:" if s=="PASS" else (":warning:" if s=="EXPECTED" else ":x:")
+          overall  = os.environ.get("OVERALL","ERROR")
+          run_num  = os.environ.get("RUN_NUMBER","?")
+          run_url  = os.environ.get("RUN_URL","#")
+          branch   = os.environ.get("BRANCH","main")
+          actor    = os.environ.get("ACTOR","unknown")
+          repo     = os.environ.get("REPO","")
 
-          if overall == "PASS":
-              color="#1a7f37"; title="All tests passed"
-          elif overall == "FAIL":
-              color="#cf222e"; title="Tests failed"
-          else:
-              color="#9a6700"; title="Tests completed with warnings"
+          def g(k): return os.environ.get(k,"0")
+          def icon(s): return ":white_check_mark:" if s=="PASS" else (":warning:" if s=="EXPECTED" else ":x:")
+          def row(label, users, samp, err, epct, avg, status):
+              return f"{icon(status)} *{label} ({users} users)*\nSamples: {samp} | Errors: {err} ({epct}%) | Avg RT: {avg}ms"
 
-          payload = {
-            "attachments": [{
-              "color": color,
-              "fallback": f"DemoBlaze — {title} (Run #{run_num})",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {"type": "plain_text", "text": f"{icon(overall)}  DemoBlaze Performance Tests — {title}"}
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {"type": "mrkdwn", "text": f"*Run Number*\n#{run_num}"},
-                    {"type": "mrkdwn", "text": f"*Branch*\n`{branch}`"},
-                    {"type": "mrkdwn", "text": f"*Triggered By*\n{actor}"},
-                    {"type": "mrkdwn", "text": f"*Repository*\n{repo}"}
-                  ]
-                },
-                {"type": "divider"},
-                {
-                  "type": "section",
-                  "fields": [
-                    {"type": "mrkdwn", "text": f"{icon(b_status)} *Baseline (50 users)*\nSamples: {b_samples} | Errors: {b_errors} ({b_epct}%)\nAvg RT: {b_avg}ms | P90: {b_p90}ms"},
-                    {"type": "mrkdwn", "text": f"{icon(m_status)} *Medium Load (150 users)*\nSamples: {m_samples} | Errors: {m_errors} ({m_epct}%)\nAvg RT: {m_avg}ms"}
-                  ]
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {"type": "mrkdwn", "text": f"{icon(s_status)} *Stress Test (500 users)*\nSamples: {s_samples} | Errors: {s_errors} ({s_epct}%)\nAvg RT: {s_avg}ms _(expected findings)_"},
-                    {"type": "mrkdwn", "text": "*SLA Thresholds*\nAvg RT < 2,000ms\nError Rate < 1%"}
-                  ]
-                },
-                {"type": "divider"},
-                {
-                  "type": "actions",
-                  "elements": [{
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "View Full Reports & Artifacts"},
-                    "style": "primary",
-                    "url": run_url
-                  }]
-                },
-                {
-                  "type": "context",
-                  "elements": [{"type": "mrkdwn", "text": f"Apache JMeter 5.6.3  |  GitHub Actions  |  <{run_url}|Run #{run_num}>"}]
-                }
-              ]
-            }]
-          }
+          if overall=="PASS":   color="#1a7f37"; title="All tests passed"
+          elif overall=="FAIL": color="#cf222e"; title="Tests failed"
+          else:                 color="#9a6700"; title="Tests completed with warnings"
+
+          payload = {"attachments":[{"color":color,"fallback":f"DemoBlaze — {title} (Run #{run_num})","blocks":[
+            {"type":"header","text":{"type":"plain_text","text":f"{icon(overall)}  DemoBlaze Performance Tests — {title}"}},
+            {"type":"section","fields":[
+              {"type":"mrkdwn","text":f"*Run Number*\n#{run_num}"},
+              {"type":"mrkdwn","text":f"*Branch*\n`{branch}`"},
+              {"type":"mrkdwn","text":f"*Triggered By*\n{actor}"},
+              {"type":"mrkdwn","text":f"*Repository*\n{repo}"}
+            ]},
+            {"type":"divider"},
+            {"type":"section","text":{"type":"mrkdwn","text":"*Test Phase Results*"}},
+            {"type":"section","fields":[
+              {"type":"mrkdwn","text":row("Baseline",    50,  g("B_SAMPLES"),g("B_ERRORS"),g("B_ERROR_PCT"),g("B_AVG_RT"),g("B_STATUS"))},
+              {"type":"mrkdwn","text":row("Medium Load", 150, g("M_SAMPLES"),g("M_ERRORS"),g("M_ERROR_PCT"),g("M_AVG_RT"),g("M_STATUS"))}
+            ]},
+            {"type":"section","fields":[
+              {"type":"mrkdwn","text":row("Peak Load",   300, g("P_SAMPLES"),g("P_ERRORS"),g("P_ERROR_PCT"),g("P_AVG_RT"),g("P_STATUS"))},
+              {"type":"mrkdwn","text":row("Stress Test", 500, g("S_SAMPLES"),g("S_ERRORS"),g("S_ERROR_PCT"),g("S_AVG_RT"),g("S_STATUS"))+" _(expected)_"}
+            ]},
+            {"type":"section","fields":[
+              {"type":"mrkdwn","text":row("Endurance",   100, g("E_SAMPLES"),g("E_ERRORS"),g("E_ERROR_PCT"),g("E_AVG_RT"),g("E_STATUS"))+" _(30 min)_"},
+              {"type":"mrkdwn","text":"*SLA Thresholds*\nAvg RT < 2,000ms\nError Rate < 1%"}
+            ]},
+            {"type":"divider"},
+            {"type":"actions","elements":[{"type":"button","text":{"type":"plain_text","text":"View Full Reports & Artifacts"},"style":"primary","url":run_url}]},
+            {"type":"context","elements":[{"type":"mrkdwn","text":f"Apache JMeter 5.6.3  |  GitHub Actions  |  <{run_url}|Run #{run_num}>"}]}
+          ]}]}
 
           data = json.dumps(payload).encode("utf-8")
-          req  = urllib.request.Request(webhook, data=data,
-                     headers={"Content-Type": "application/json"}, method="POST")
+          req  = urllib.request.Request(webhook, data=data, headers={"Content-Type":"application/json"}, method="POST")
           try:
               with urllib.request.urlopen(req, timeout=15) as r:
                   print(f"Slack notification sent — HTTP {r.status}")
           except urllib.error.HTTPError as e:
-              print(f"Slack error {e.code}: {e.read().decode()}")
-              sys.exit(1)
+              print(f"Slack error {e.code}: {e.read().decode()}"); sys.exit(1)
           except Exception as e:
-              print(f"Slack error: {e}")
-              sys.exit(1)
+              print(f"Slack error: {e}"); sys.exit(1)
           PYEOF

@@ -3,29 +3,39 @@ name: Email Notification
 on:
   workflow_call:
     inputs:
-      overall_status:     { required: true, type: string }
-      run_number:         { required: true, type: string }
-      run_url:            { required: true, type: string }
-      run_date:           { required: true, type: string }
-      branch:             { required: true, type: string }
-      actor:              { required: true, type: string }
-      repo:               { required: true, type: string }
-      baseline_samples:   { required: true, type: string }
-      baseline_errors:    { required: true, type: string }
-      baseline_error_pct: { required: true, type: string }
-      baseline_avg_rt:    { required: true, type: string }
-      baseline_p90:       { required: true, type: string }
-      baseline_status:    { required: true, type: string }
-      medium_samples:     { required: true, type: string }
-      medium_errors:      { required: true, type: string }
-      medium_error_pct:   { required: true, type: string }
-      medium_avg_rt:      { required: true, type: string }
-      medium_status:      { required: true, type: string }
-      stress_samples:     { required: true, type: string }
-      stress_errors:      { required: true, type: string }
-      stress_error_pct:   { required: true, type: string }
-      stress_avg_rt:      { required: true, type: string }
-      stress_status:      { required: true, type: string }
+      overall_status:      { required: true, type: string }
+      run_number:          { required: true, type: string }
+      run_url:             { required: true, type: string }
+      run_date:            { required: true, type: string }
+      branch:              { required: true, type: string }
+      actor:               { required: true, type: string }
+      repo:                { required: true, type: string }
+      baseline_samples:    { required: true, type: string }
+      baseline_errors:     { required: true, type: string }
+      baseline_error_pct:  { required: true, type: string }
+      baseline_avg_rt:     { required: true, type: string }
+      baseline_p90:        { required: true, type: string }
+      baseline_status:     { required: true, type: string }
+      medium_samples:      { required: true, type: string }
+      medium_errors:       { required: true, type: string }
+      medium_error_pct:    { required: true, type: string }
+      medium_avg_rt:       { required: true, type: string }
+      medium_status:       { required: true, type: string }
+      peak_samples:        { required: true, type: string }
+      peak_errors:         { required: true, type: string }
+      peak_error_pct:      { required: true, type: string }
+      peak_avg_rt:         { required: true, type: string }
+      peak_status:         { required: true, type: string }
+      stress_samples:      { required: true, type: string }
+      stress_errors:       { required: true, type: string }
+      stress_error_pct:    { required: true, type: string }
+      stress_avg_rt:       { required: true, type: string }
+      stress_status:       { required: true, type: string }
+      endurance_samples:   { required: true, type: string }
+      endurance_errors:    { required: true, type: string }
+      endurance_error_pct: { required: true, type: string }
+      endurance_avg_rt:    { required: true, type: string }
+      endurance_status:    { required: true, type: string }
     secrets:
       GMAIL_USERNAME:     { required: true }
       GMAIL_APP_PASSWORD: { required: true }
@@ -34,65 +44,62 @@ on:
 jobs:
   notify-email:
     runs-on: ubuntu-latest
-
     steps:
       - name: Send Email Notification
         env:
-          GMAIL_USERNAME:     ${{ secrets.GMAIL_USERNAME }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          NOTIFY_EMAIL:       ${{ secrets.NOTIFY_EMAIL }}
-          OVERALL:            ${{ inputs.overall_status }}
-          RUN_NUMBER:         ${{ inputs.run_number }}
-          RUN_URL:            ${{ inputs.run_url }}
-          RUN_DATE:           ${{ inputs.run_date }}
-          BRANCH:             ${{ inputs.branch }}
-          ACTOR:              ${{ inputs.actor }}
-          REPO:               ${{ inputs.repo }}
-          B_SAMPLES:          ${{ inputs.baseline_samples }}
-          B_ERRORS:           ${{ inputs.baseline_errors }}
-          B_ERROR_PCT:        ${{ inputs.baseline_error_pct }}
-          B_AVG_RT:           ${{ inputs.baseline_avg_rt }}
-          B_P90:              ${{ inputs.baseline_p90 }}
-          B_STATUS:           ${{ inputs.baseline_status }}
-          M_SAMPLES:          ${{ inputs.medium_samples }}
-          M_ERRORS:           ${{ inputs.medium_errors }}
-          M_ERROR_PCT:        ${{ inputs.medium_error_pct }}
-          M_AVG_RT:           ${{ inputs.medium_avg_rt }}
-          M_STATUS:           ${{ inputs.medium_status }}
-          S_SAMPLES:          ${{ inputs.stress_samples }}
-          S_ERRORS:           ${{ inputs.stress_errors }}
-          S_ERROR_PCT:        ${{ inputs.stress_error_pct }}
-          S_AVG_RT:           ${{ inputs.stress_avg_rt }}
-          S_STATUS:           ${{ inputs.stress_status }}
+          GMAIL_USERNAME:      ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAIL:        ${{ secrets.NOTIFY_EMAIL }}
+          OVERALL:             ${{ inputs.overall_status }}
+          RUN_NUMBER:          ${{ inputs.run_number }}
+          RUN_URL:             ${{ inputs.run_url }}
+          RUN_DATE:            ${{ inputs.run_date }}
+          BRANCH:              ${{ inputs.branch }}
+          ACTOR:               ${{ inputs.actor }}
+          REPO:                ${{ inputs.repo }}
+          B_SAMPLES:           ${{ inputs.baseline_samples }}
+          B_ERRORS:            ${{ inputs.baseline_errors }}
+          B_ERROR_PCT:         ${{ inputs.baseline_error_pct }}
+          B_AVG_RT:            ${{ inputs.baseline_avg_rt }}
+          B_P90:               ${{ inputs.baseline_p90 }}
+          B_STATUS:            ${{ inputs.baseline_status }}
+          M_SAMPLES:           ${{ inputs.medium_samples }}
+          M_ERRORS:            ${{ inputs.medium_errors }}
+          M_ERROR_PCT:         ${{ inputs.medium_error_pct }}
+          M_AVG_RT:            ${{ inputs.medium_avg_rt }}
+          M_STATUS:            ${{ inputs.medium_status }}
+          P_SAMPLES:           ${{ inputs.peak_samples }}
+          P_ERRORS:            ${{ inputs.peak_errors }}
+          P_ERROR_PCT:         ${{ inputs.peak_error_pct }}
+          P_AVG_RT:            ${{ inputs.peak_avg_rt }}
+          P_STATUS:            ${{ inputs.peak_status }}
+          S_SAMPLES:           ${{ inputs.stress_samples }}
+          S_ERRORS:            ${{ inputs.stress_errors }}
+          S_ERROR_PCT:         ${{ inputs.stress_error_pct }}
+          S_AVG_RT:            ${{ inputs.stress_avg_rt }}
+          S_STATUS:            ${{ inputs.stress_status }}
+          E_SAMPLES:           ${{ inputs.endurance_samples }}
+          E_ERRORS:            ${{ inputs.endurance_errors }}
+          E_ERROR_PCT:         ${{ inputs.endurance_error_pct }}
+          E_AVG_RT:            ${{ inputs.endurance_avg_rt }}
+          E_STATUS:            ${{ inputs.endurance_status }}
         run: |
           python3 << 'PYEOF'
           import smtplib, os, sys
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
 
-          sender   = os.environ.get("GMAIL_USERNAME",     "")
-          password = os.environ.get("GMAIL_APP_PASSWORD", "")
-          recipient= os.environ.get("NOTIFY_EMAIL",       "")
-          overall  = os.environ.get("OVERALL",   "ERROR")
-          run_num  = os.environ.get("RUN_NUMBER","?")
-          run_url  = os.environ.get("RUN_URL",   "#")
-          run_date = os.environ.get("RUN_DATE",  "")
-          branch   = os.environ.get("BRANCH",   "main")
-          actor    = os.environ.get("ACTOR",    "unknown")
-          repo     = os.environ.get("REPO",     "")
-          b_samples= os.environ.get("B_SAMPLES","0"); b_errors=os.environ.get("B_ERRORS","0")
-          b_epct   = os.environ.get("B_ERROR_PCT","0"); b_avg=os.environ.get("B_AVG_RT","0")
-          b_p90    = os.environ.get("B_P90","0"); b_status=os.environ.get("B_STATUS","ERROR")
-          m_samples= os.environ.get("M_SAMPLES","0"); m_errors=os.environ.get("M_ERRORS","0")
-          m_epct   = os.environ.get("M_ERROR_PCT","0"); m_avg=os.environ.get("M_AVG_RT","0")
-          m_status = os.environ.get("M_STATUS","ERROR")
-          s_samples= os.environ.get("S_SAMPLES","0"); s_errors=os.environ.get("S_ERRORS","0")
-          s_epct   = os.environ.get("S_ERROR_PCT","0"); s_avg=os.environ.get("S_AVG_RT","0")
-          s_status = os.environ.get("S_STATUS","ERROR")
+          sender   = os.environ.get("GMAIL_USERNAME","")
+          password = os.environ.get("GMAIL_APP_PASSWORD","")
+          recipient= os.environ.get("NOTIFY_EMAIL","")
 
-          if not all([sender, password, recipient]):
-              print("Email secrets not configured — skipping")
-              sys.exit(0)
+          if not all([sender,password,recipient]):
+              print("Email secrets not configured — skipping"); sys.exit(0)
+
+          def g(k): return os.environ.get(k,"0")
+
+          overall  = g("OVERALL"); run_num=g("RUN_NUMBER"); run_url=g("RUN_URL")
+          run_date = g("RUN_DATE"); branch=g("BRANCH"); actor=g("ACTOR"); repo=g("REPO")
 
           def badge(s):
               if s=="PASS":     return '<span style="background:#1a7f37;color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">PASS</span>'
@@ -100,10 +107,19 @@ jobs:
               if s=="ERROR":    return '<span style="background:#57606a;color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">ERROR</span>'
               return '<span style="background:#cf222e;color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">FAIL</span>'
 
+          def tr(phase, users, samp, err, epct, avg, p90, status, alt=False):
+              bg = "background:#f6f8fa;" if alt else ""
+              bd = "border-bottom:1px solid #d0d7de;"
+              return f'<tr style="{bg}"><td style="padding:11px 12px;font-weight:600;{bd}">{phase}</td><td style="padding:11px 12px;text-align:center;color:#57606a;{bd}">{users}</td><td style="padding:11px 12px;text-align:center;color:#57606a;{bd}">{samp}</td><td style="padding:11px 12px;text-align:center;color:#57606a;{bd}">{err}</td><td style="padding:11px 12px;text-align:center;color:#57606a;{bd}">{epct}%</td><td style="padding:11px 12px;text-align:center;color:#57606a;{bd}">{avg}ms</td><td style="padding:11px 12px;text-align:center;color:#57606a;{bd}">{p90}</td><td style="padding:11px 12px;text-align:center;{bd}">{badge(status)}</td></tr>'
+
+          def tr_last(phase, users, samp, err, epct, avg, p90, status, alt=False):
+              bg = "background:#f6f8fa;" if alt else ""
+              return f'<tr style="{bg}"><td style="padding:11px 12px;font-weight:600;">{phase}</td><td style="padding:11px 12px;text-align:center;color:#57606a;">{users}</td><td style="padding:11px 12px;text-align:center;color:#57606a;">{samp}</td><td style="padding:11px 12px;text-align:center;color:#57606a;">{err}</td><td style="padding:11px 12px;text-align:center;color:#57606a;">{epct}%</td><td style="padding:11px 12px;text-align:center;color:#57606a;">{avg}ms</td><td style="padding:11px 12px;text-align:center;color:#57606a;">{p90}</td><td style="padding:11px 12px;text-align:center;">{badge(status)}</td></tr>'
+
           if overall=="PASS":
               hbg="#1a7f37"; sbg="#1a7f37"; stext="&#10003;&nbsp; ALL TESTS PASSED"
               abg="#dafbe1"; aborder="#a7f3c1"; acolor="#1a7f37"
-              amsg="Baseline and medium load tests completed successfully. All SLA thresholds were met."
+              amsg="All five test phases completed successfully. All SLA thresholds were met."
               subject=f"\u2705 JMeter Performance Report \u2014 Run #{run_num} PASSED"
           elif overall=="FAIL":
               hbg="#cf222e"; sbg="#cf222e"; stext="&#10007;&nbsp; TESTS FAILED"
@@ -117,11 +133,11 @@ jobs:
               subject=f"\u26a0\ufe0f JMeter Performance Report \u2014 Run #{run_num} ERROR"
 
           html = f"""<!DOCTYPE html><html lang="en">
-          <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+          <head><meta charset="UTF-8"></head>
           <body style="margin:0;padding:0;background:#f6f8fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;color:#24292f;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8fa;padding:32px 16px;">
           <tr><td align="center">
-          <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;background:#fff;border-radius:8px;border:1px solid #d0d7de;overflow:hidden;">
+          <table width="660" cellpadding="0" cellspacing="0" style="max-width:660px;background:#fff;border-radius:8px;border:1px solid #d0d7de;overflow:hidden;">
             <tr><td style="background:{hbg};padding:28px 32px;">
               <table width="100%" cellpadding="0" cellspacing="0"><tr>
                 <td><p style="margin:0 0 4px;color:rgba(255,255,255,0.75);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">performance testing report</p>
@@ -171,36 +187,11 @@ jobs:
                   <th style="padding:10px 12px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">P90</th>
                   <th style="padding:10px 12px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Status</th>
                 </tr>
-                <tr>
-                  <td style="padding:11px 12px;font-weight:600;border-bottom:1px solid #d0d7de;">Baseline</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">50</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{b_samples}</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{b_errors}</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{b_epct}%</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{b_avg}ms</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{b_p90}ms</td>
-                  <td style="padding:11px 12px;text-align:center;border-bottom:1px solid #d0d7de;">{badge(b_status)}</td>
-                </tr>
-                <tr style="background:#f6f8fa;">
-                  <td style="padding:11px 12px;font-weight:600;border-bottom:1px solid #d0d7de;">Load (medium)</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">150</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{m_samples}</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{m_errors}</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{m_epct}%</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">{m_avg}ms</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">—</td>
-                  <td style="padding:11px 12px;text-align:center;border-bottom:1px solid #d0d7de;">{badge(m_status)}</td>
-                </tr>
-                <tr>
-                  <td style="padding:11px 12px;font-weight:600;">Stress test</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;">500</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;">{s_samples}</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;">{s_errors}</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;">{s_epct}%</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;">{s_avg}ms</td>
-                  <td style="padding:11px 12px;text-align:center;color:#57606a;">—</td>
-                  <td style="padding:11px 12px;text-align:center;">{badge(s_status)}</td>
-                </tr>
+                {tr("Baseline",       50,  g("B_SAMPLES"),g("B_ERRORS"),g("B_ERROR_PCT"),g("B_AVG_RT"),g("B_P90")+"ms", g("B_STATUS"), False)}
+                {tr("Load (medium)",  150, g("M_SAMPLES"),g("M_ERRORS"),g("M_ERROR_PCT"),g("M_AVG_RT"),"—",            g("M_STATUS"), True)}
+                {tr("Peak load",      300, g("P_SAMPLES"),g("P_ERRORS"),g("P_ERROR_PCT"),g("P_AVG_RT"),"—",            g("P_STATUS"), False)}
+                {tr("Stress test",    500, g("S_SAMPLES"),g("S_ERRORS"),g("S_ERROR_PCT"),g("S_AVG_RT"),"—",            g("S_STATUS"), True)}
+                {tr_last("Endurance", 100, g("E_SAMPLES"),g("E_ERRORS"),g("E_ERROR_PCT"),g("E_AVG_RT"),"30 min",       g("E_STATUS"), False)}
               </table>
             </td></tr>
             <tr><td style="padding:16px 32px 0;">
@@ -229,9 +220,7 @@ jobs:
                   srv.sendmail(sender, recipient, msg.as_string())
                   print(f"Email sent to {recipient}")
           except smtplib.SMTPAuthenticationError:
-              print("Gmail auth failed — check GMAIL_USERNAME and GMAIL_APP_PASSWORD secrets")
-              sys.exit(1)
+              print("Gmail auth failed — check GMAIL_USERNAME and GMAIL_APP_PASSWORD secrets"); sys.exit(1)
           except Exception as e:
-              print(f"Email error: {e}")
-              sys.exit(1)
+              print(f"Email error: {e}"); sys.exit(1)
           PYEOF
