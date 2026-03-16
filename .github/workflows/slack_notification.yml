@@ -1,170 +1,166 @@
 name: Slack Notification
 
 on:
-  workflow_run:
-    workflows: [ "JMeter Performance Tests" ]
-    types: [ completed ]
+  workflow_call:
+    inputs:
+      overall_status:     { required: true, type: string }
+      run_number:         { required: true, type: string }
+      run_url:            { required: true, type: string }
+      branch:             { required: true, type: string }
+      actor:              { required: true, type: string }
+      repo:               { required: true, type: string }
+      baseline_samples:   { required: true, type: string }
+      baseline_errors:    { required: true, type: string }
+      baseline_error_pct: { required: true, type: string }
+      baseline_avg_rt:    { required: true, type: string }
+      baseline_p90:       { required: true, type: string }
+      baseline_status:    { required: true, type: string }
+      medium_samples:     { required: true, type: string }
+      medium_errors:      { required: true, type: string }
+      medium_error_pct:   { required: true, type: string }
+      medium_avg_rt:      { required: true, type: string }
+      medium_status:      { required: true, type: string }
+      stress_samples:     { required: true, type: string }
+      stress_errors:      { required: true, type: string }
+      stress_error_pct:   { required: true, type: string }
+      stress_avg_rt:      { required: true, type: string }
+      stress_status:      { required: true, type: string }
+    secrets:
+      SLACK_WEBHOOK_URL:  { required: true }
 
 jobs:
   notify-slack:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fetch Workflow Run Results
-        id: results
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const run = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo:  context.repo.repo,
-              run_id: context.payload.workflow_run.id
-            });
-
-            const jobs = await github.rest.actions.listJobsForWorkflowRun({
-              owner:  context.repo.owner,
-              repo:   context.repo.repo,
-              run_id: context.payload.workflow_run.id
-            });
-
-            // Extract outputs from the performance-test job steps
-            const jobData = {};
-            for (const job of jobs.data.jobs) {
-              if (job.name === 'performance-test') {
-                for (const step of job.steps) {
-                  jobData[step.name] = step.conclusion;
-                }
-              }
-            }
-
-            core.setOutput('run_id',     run.data.id);
-            core.setOutput('run_number', run.data.run_number);
-            core.setOutput('run_url',    run.data.html_url);
-            core.setOutput('conclusion', run.data.conclusion);
-            core.setOutput('branch',     run.data.head_branch);
-            core.setOutput('actor',      run.data.triggering_actor?.login || 'unknown');
-            core.setOutput('commit_msg', run.data.head_commit?.message?.split('\n')[0] || '');
-            core.setOutput('commit_sha', run.data.head_sha?.substring(0, 7) || '');
-
       - name: Send Slack Notification
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-          CONCLUSION:    ${{ steps.results.outputs.conclusion }}
-          RUN_NUMBER:    ${{ steps.results.outputs.run_number }}
-          RUN_URL:       ${{ steps.results.outputs.run_url }}
-          BRANCH:        ${{ steps.results.outputs.branch }}
-          ACTOR:         ${{ steps.results.outputs.actor }}
-          COMMIT_MSG:    ${{ steps.results.outputs.commit_msg }}
-          COMMIT_SHA:    ${{ steps.results.outputs.commit_sha }}
-          REPO:          ${{ github.repository }}
+          SLACK_WEBHOOK:      ${{ secrets.SLACK_WEBHOOK_URL }}
+          OVERALL:            ${{ inputs.overall_status }}
+          RUN_NUMBER:         ${{ inputs.run_number }}
+          RUN_URL:            ${{ inputs.run_url }}
+          BRANCH:             ${{ inputs.branch }}
+          ACTOR:              ${{ inputs.actor }}
+          REPO:               ${{ inputs.repo }}
+          B_SAMPLES:          ${{ inputs.baseline_samples }}
+          B_ERRORS:           ${{ inputs.baseline_errors }}
+          B_ERROR_PCT:        ${{ inputs.baseline_error_pct }}
+          B_AVG_RT:           ${{ inputs.baseline_avg_rt }}
+          B_P90:              ${{ inputs.baseline_p90 }}
+          B_STATUS:           ${{ inputs.baseline_status }}
+          M_SAMPLES:          ${{ inputs.medium_samples }}
+          M_ERRORS:           ${{ inputs.medium_errors }}
+          M_ERROR_PCT:        ${{ inputs.medium_error_pct }}
+          M_AVG_RT:           ${{ inputs.medium_avg_rt }}
+          M_STATUS:           ${{ inputs.medium_status }}
+          S_SAMPLES:          ${{ inputs.stress_samples }}
+          S_ERRORS:           ${{ inputs.stress_errors }}
+          S_ERROR_PCT:        ${{ inputs.stress_error_pct }}
+          S_AVG_RT:           ${{ inputs.stress_avg_rt }}
+          S_STATUS:           ${{ inputs.stress_status }}
         run: |
-          # ── Determine colour and icon based on conclusion ──
-          if [ "$CONCLUSION" = "success" ]; then
-            COLOR="#1a7f37"
-            ICON=":white_check_mark:"
-            TITLE="Performance Tests Passed"
-            SUMMARY="All SLA thresholds were met. Baseline and medium load tests completed successfully."
-          elif [ "$CONCLUSION" = "failure" ]; then
-            COLOR="#cf222e"
-            ICON=":x:"
-            TITLE="Performance Tests Failed"
-            SUMMARY="One or more test phases did not meet SLA thresholds. Review the HTML reports for details."
-          else
-            COLOR="#9a6700"
-            ICON=":warning:"
-            TITLE="Performance Tests — $CONCLUSION"
-            SUMMARY="The workflow completed with status: $CONCLUSION. Check the Actions tab for details."
-          fi
+          python3 << 'PYEOF'
+          import json, os, sys, urllib.request, urllib.error
 
-          # ── Build and send Slack Block Kit payload ──
-          python3 << PYEOF
-          import json, os, urllib.request, urllib.error
+          webhook  = os.environ.get("SLACK_WEBHOOK", "")
+          overall  = os.environ.get("OVERALL",     "ERROR")
+          run_num  = os.environ.get("RUN_NUMBER",  "?")
+          run_url  = os.environ.get("RUN_URL",     "#")
+          branch   = os.environ.get("BRANCH",      "main")
+          actor    = os.environ.get("ACTOR",       "unknown")
+          repo     = os.environ.get("REPO",        "")
+          b_samples  = os.environ.get("B_SAMPLES",   "0")
+          b_errors   = os.environ.get("B_ERRORS",    "0")
+          b_epct     = os.environ.get("B_ERROR_PCT", "0")
+          b_avg      = os.environ.get("B_AVG_RT",    "0")
+          b_p90      = os.environ.get("B_P90",       "0")
+          b_status   = os.environ.get("B_STATUS",    "ERROR")
+          m_samples  = os.environ.get("M_SAMPLES",   "0")
+          m_errors   = os.environ.get("M_ERRORS",    "0")
+          m_epct     = os.environ.get("M_ERROR_PCT", "0")
+          m_avg      = os.environ.get("M_AVG_RT",    "0")
+          m_status   = os.environ.get("M_STATUS",    "ERROR")
+          s_samples  = os.environ.get("S_SAMPLES",   "0")
+          s_errors   = os.environ.get("S_ERRORS",    "0")
+          s_epct     = os.environ.get("S_ERROR_PCT", "0")
+          s_avg      = os.environ.get("S_AVG_RT",    "0")
+          s_status   = os.environ.get("S_STATUS",    "ERROR")
 
-          webhook   = os.environ["SLACK_WEBHOOK"]
-          color     = os.environ["COLOR"]
-          icon      = os.environ["ICON"]
-          title     = os.environ["TITLE"]
-          summary   = os.environ["SUMMARY"]
-          run_num   = os.environ["RUN_NUMBER"]
-          run_url   = os.environ["RUN_URL"]
-          branch    = os.environ["BRANCH"]
-          actor     = os.environ["ACTOR"]
-          commit    = os.environ["COMMIT_MSG"]
-          sha       = os.environ["COMMIT_SHA"]
-          repo      = os.environ["REPO"]
+          if not webhook:
+              print("SLACK_WEBHOOK_URL not set — skipping")
+              sys.exit(0)
+
+          def icon(s):
+              return ":white_check_mark:" if s=="PASS" else (":warning:" if s=="EXPECTED" else ":x:")
+
+          if overall == "PASS":
+              color="#1a7f37"; title="All tests passed"
+          elif overall == "FAIL":
+              color="#cf222e"; title="Tests failed"
+          else:
+              color="#9a6700"; title="Tests completed with warnings"
 
           payload = {
-            "attachments": [
-              {
-                "color": color,
-                "fallback": f"{icon} DemoBlaze — {title} (Run #{run_num})",
-                "blocks": [
-                  {
-                    "type": "header",
-                    "text": {
-                      "type": "plain_text",
-                      "text": f"{icon}  DemoBlaze — {title}"
-                    }
-                  },
-                  {
-                    "type": "section",
-                    "text": {
-                      "type": "mrkdwn",
-                      "text": summary
-                    }
-                  },
-                  { "type": "divider" },
-                  {
-                    "type": "section",
-                    "fields": [
-                      { "type": "mrkdwn", "text": f"*Run Number*\n#{run_num}" },
-                      { "type": "mrkdwn", "text": f"*Branch*\n`{branch}`" },
-                      { "type": "mrkdwn", "text": f"*Triggered By*\n{actor}" },
-                      { "type": "mrkdwn", "text": f"*Commit*\n`{sha}` {commit[:50]}" }
-                    ]
-                  },
-                  { "type": "divider" },
-                  {
-                    "type": "context",
-                    "elements": [
-                      {
-                        "type": "mrkdwn",
-                        "text": f":link: <{run_url}|View Full Run & Download HTML Reports>  |  :file_folder: {repo}"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "actions",
-                    "elements": [
-                      {
-                        "type": "button",
-                        "text": { "type": "plain_text", "text": "Open GitHub Actions Run" },
-                        "style": "primary",
-                        "url": run_url
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
+            "attachments": [{
+              "color": color,
+              "fallback": f"DemoBlaze — {title} (Run #{run_num})",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {"type": "plain_text", "text": f"{icon(overall)}  DemoBlaze Performance Tests — {title}"}
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": f"*Run Number*\n#{run_num}"},
+                    {"type": "mrkdwn", "text": f"*Branch*\n`{branch}`"},
+                    {"type": "mrkdwn", "text": f"*Triggered By*\n{actor}"},
+                    {"type": "mrkdwn", "text": f"*Repository*\n{repo}"}
+                  ]
+                },
+                {"type": "divider"},
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": f"{icon(b_status)} *Baseline (50 users)*\nSamples: {b_samples} | Errors: {b_errors} ({b_epct}%)\nAvg RT: {b_avg}ms | P90: {b_p90}ms"},
+                    {"type": "mrkdwn", "text": f"{icon(m_status)} *Medium Load (150 users)*\nSamples: {m_samples} | Errors: {m_errors} ({m_epct}%)\nAvg RT: {m_avg}ms"}
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": f"{icon(s_status)} *Stress Test (500 users)*\nSamples: {s_samples} | Errors: {s_errors} ({s_epct}%)\nAvg RT: {s_avg}ms _(expected findings)_"},
+                    {"type": "mrkdwn", "text": "*SLA Thresholds*\nAvg RT < 2,000ms\nError Rate < 1%"}
+                  ]
+                },
+                {"type": "divider"},
+                {
+                  "type": "actions",
+                  "elements": [{
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "View Full Reports & Artifacts"},
+                    "style": "primary",
+                    "url": run_url
+                  }]
+                },
+                {
+                  "type": "context",
+                  "elements": [{"type": "mrkdwn", "text": f"Apache JMeter 5.6.3  |  GitHub Actions  |  <{run_url}|Run #{run_num}>"}]
+                }
+              ]
+            }]
           }
 
           data = json.dumps(payload).encode("utf-8")
-          req  = urllib.request.Request(
-                     webhook,
-                     data=data,
-                     headers={"Content-Type": "application/json"},
-                     method="POST"
-                 )
-
+          req  = urllib.request.Request(webhook, data=data,
+                     headers={"Content-Type": "application/json"}, method="POST")
           try:
-              with urllib.request.urlopen(req, timeout=10) as resp:
-                  print(f"Slack notification sent — HTTP {resp.status}")
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  print(f"Slack notification sent — HTTP {r.status}")
           except urllib.error.HTTPError as e:
-              body = e.read().decode()
-              print(f"Slack HTTP error {e.code}: {body}")
-              raise
+              print(f"Slack error {e.code}: {e.read().decode()}")
+              sys.exit(1)
           except Exception as e:
               print(f"Slack error: {e}")
-              raise
+              sys.exit(1)
           PYEOF

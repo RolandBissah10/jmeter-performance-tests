@@ -34,7 +34,7 @@ jobs:
 
     steps:
 
-      # ── SETUP ──────────────────────────────────────────────────────────
+      # ── SETUP ────────────────────────────────────────────────────────
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -68,13 +68,13 @@ jobs:
       - name: Verify JMX File Exists
         run: |
           if [ ! -f "Demoblaze_Performance_Test.jmx" ]; then
-            echo "ERROR: JMX file not found in repository root"
+            echo "ERROR: JMX file not found. Files in repo root:"
             ls -la
             exit 1
           fi
           echo "JMX file confirmed: Demoblaze_Performance_Test.jmx"
 
-      # ── BASELINE TEST ── 50 Users ───────────────────────────────────────
+      # ── BASELINE TEST ── 50 Users ─────────────────────────────────────
       - name: Run Baseline Test (50 Users)
         run: |
           jmeter -n \
@@ -90,49 +90,30 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import csv, os, sys
-
           filepath = "reports/baseline/results.jtl"
           output   = os.environ.get("GITHUB_OUTPUT", "/dev/stdout")
-
-          def write(key, val):
-              with open(output, "a") as f:
-                  f.write(f"{key}={val}\n")
-
+          def write(k, v):
+              open(output, "a").write(f"{k}={v}\n")
           if not os.path.exists(filepath):
-              for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("p90",0),("status","ERROR")]:
-                  write(k, v)
-              print("No results file found — ERROR")
+              [write(k,v) for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("p90",0),("status","ERROR")]]
               sys.exit(0)
-
-          rows = []
-          with open(filepath, newline="", encoding="utf-8", errors="replace") as f:
-              for row in csv.DictReader(f):
-                  rows.append(row)
-
-          samples = len(rows)
-          if samples == 0:
-              for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("p90",0),("status","ERROR")]:
-                  write(k, v)
-              sys.exit(0)
-
-          errors    = sum(1 for r in rows if r.get("success","true").strip().lower() == "false")
-          error_pct = round(errors * 100 / samples, 2)
-          times     = [int(r.get("elapsed", 0)) for r in rows if r.get("elapsed","").isdigit()]
-          avg_rt    = round(sum(times) / len(times)) if times else 0
-          p90       = sorted(times)[int(len(times) * 0.9)] if times else 0
+          rows = list(csv.DictReader(open(filepath, encoding="utf-8", errors="replace")))
+          samples   = len(rows)
+          errors    = sum(1 for r in rows if r.get("success","true").strip().lower()=="false")
+          error_pct = round(errors*100/samples,2) if samples else 0
+          times     = [int(r["elapsed"]) for r in rows if r.get("elapsed","").isdigit()]
+          avg_rt    = round(sum(times)/len(times)) if times else 0
+          p90       = sorted(times)[int(len(times)*0.9)] if times else 0
           status    = "PASS" if error_pct < 1 and avg_rt < 2000 else "FAIL"
-
-          for k,v in [("samples",samples),("errors",errors),("error_pct",error_pct),("avg_rt",avg_rt),("p90",p90),("status",status)]:
-              write(k, v)
+          [write(k,v) for k,v in [("samples",samples),("errors",errors),("error_pct",error_pct),("avg_rt",avg_rt),("p90",p90),("status",status)]]
           print(f"Baseline: {samples} samples | {errors} errors ({error_pct}%) | avg {avg_rt}ms | p90 {p90}ms | {status}")
           PYEOF
 
-      # ── MEDIUM LOAD TEST ── 150 Users ───────────────────────────────────
-      - name: Switch to TG2 — Medium Load (150 Users)
+      # ── MEDIUM LOAD TEST ── 150 Users ─────────────────────────────────
+      - name: Switch to TG2 (150 Users)
         run: |
           sed -i 's/testname="TG1 - Light Load (50 Users - Baseline)" enabled="true"/testname="TG1 - Light Load (50 Users - Baseline)" enabled="false"/' Demoblaze_Performance_Test.jmx
           sed -i 's/testname="TG2 - Medium Load (150 Users)" enabled="false"/testname="TG2 - Medium Load (150 Users)" enabled="true"/' Demoblaze_Performance_Test.jmx
-          echo "Switched to TG2"
 
       - name: Run Medium Load Test (150 Users)
         run: |
@@ -149,42 +130,29 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import csv, os, sys
-
           filepath = "reports/medium/results.jtl"
           output   = os.environ.get("GITHUB_OUTPUT", "/dev/stdout")
-
-          def write(key, val):
-              with open(output, "a") as f:
-                  f.write(f"{key}={val}\n")
-
+          def write(k, v):
+              open(output, "a").write(f"{k}={v}\n")
           if not os.path.exists(filepath):
-              for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("status","ERROR")]:
-                  write(k, v)
+              [write(k,v) for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("status","ERROR")]]
               sys.exit(0)
-
-          rows = []
-          with open(filepath, newline="", encoding="utf-8", errors="replace") as f:
-              for row in csv.DictReader(f):
-                  rows.append(row)
-
+          rows = list(csv.DictReader(open(filepath, encoding="utf-8", errors="replace")))
           samples   = len(rows)
-          errors    = sum(1 for r in rows if r.get("success","true").strip().lower() == "false")
-          error_pct = round(errors * 100 / samples, 2) if samples else 0
-          times     = [int(r.get("elapsed", 0)) for r in rows if r.get("elapsed","").isdigit()]
-          avg_rt    = round(sum(times) / len(times)) if times else 0
+          errors    = sum(1 for r in rows if r.get("success","true").strip().lower()=="false")
+          error_pct = round(errors*100/samples,2) if samples else 0
+          times     = [int(r["elapsed"]) for r in rows if r.get("elapsed","").isdigit()]
+          avg_rt    = round(sum(times)/len(times)) if times else 0
           status    = "PASS" if error_pct < 1 and avg_rt < 2000 else "FAIL"
-
-          for k,v in [("samples",samples),("errors",errors),("error_pct",error_pct),("avg_rt",avg_rt),("status",status)]:
-              write(k, v)
+          [write(k,v) for k,v in [("samples",samples),("errors",errors),("error_pct",error_pct),("avg_rt",avg_rt),("status",status)]]
           print(f"Medium: {samples} samples | {errors} errors ({error_pct}%) | avg {avg_rt}ms | {status}")
           PYEOF
 
-      # ── STRESS TEST ── 500 Users ────────────────────────────────────────
-      - name: Switch to TG4 — Stress Test (500 Users)
+      # ── STRESS TEST ── 500 Users ──────────────────────────────────────
+      - name: Switch to TG4 (500 Users)
         run: |
           sed -i 's/testname="TG2 - Medium Load (150 Users)" enabled="true"/testname="TG2 - Medium Load (150 Users)" enabled="false"/' Demoblaze_Performance_Test.jmx
           sed -i 's/testname="TG4 - Stress Test (500 Users)" enabled="false"/testname="TG4 - Stress Test (500 Users)" enabled="true"/' Demoblaze_Performance_Test.jmx
-          echo "Switched to TG4"
 
       - name: Run Stress Test (500 Users)
         run: |
@@ -201,52 +169,37 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import csv, os, sys
-
           filepath = "reports/stress/results.jtl"
           output   = os.environ.get("GITHUB_OUTPUT", "/dev/stdout")
-
-          def write(key, val):
-              with open(output, "a") as f:
-                  f.write(f"{key}={val}\n")
-
+          def write(k, v):
+              open(output, "a").write(f"{k}={v}\n")
           if not os.path.exists(filepath):
-              for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("status","ERROR")]:
-                  write(k, v)
+              [write(k,v) for k,v in [("samples",0),("errors",0),("error_pct",0),("avg_rt",0),("status","ERROR")]]
               sys.exit(0)
-
-          rows = []
-          with open(filepath, newline="", encoding="utf-8", errors="replace") as f:
-              for row in csv.DictReader(f):
-                  rows.append(row)
-
+          rows = list(csv.DictReader(open(filepath, encoding="utf-8", errors="replace")))
           samples   = len(rows)
-          errors    = sum(1 for r in rows if r.get("success","true").strip().lower() == "false")
-          error_pct = round(errors * 100 / samples, 2) if samples else 0
-          times     = [int(r.get("elapsed", 0)) for r in rows if r.get("elapsed","").isdigit()]
-          avg_rt    = round(sum(times) / len(times)) if times else 0
-          # Stress test SLA failures are expected findings, not pipeline failures
+          errors    = sum(1 for r in rows if r.get("success","true").strip().lower()=="false")
+          error_pct = round(errors*100/samples,2) if samples else 0
+          times     = [int(r["elapsed"]) for r in rows if r.get("elapsed","").isdigit()]
+          avg_rt    = round(sum(times)/len(times)) if times else 0
           status    = "EXPECTED" if error_pct >= 1 or avg_rt >= 2000 else "PASS"
-
-          for k,v in [("samples",samples),("errors",errors),("error_pct",error_pct),("avg_rt",avg_rt),("status",status)]:
-              write(k, v)
+          [write(k,v) for k,v in [("samples",samples),("errors",errors),("error_pct",error_pct),("avg_rt",avg_rt),("status",status)]]
           print(f"Stress: {samples} samples | {errors} errors ({error_pct}%) | avg {avg_rt}ms | {status}")
           PYEOF
 
-      # ── OVERALL STATUS ──────────────────────────────────────────────────
+      # ── OVERALL STATUS ───────────────────────────────────────────────
       - name: Determine Overall Status
         id: overall
+        if: always()
         run: |
           B="${{ steps.baseline.outputs.status }}"
           M="${{ steps.medium.outputs.status }}"
-          if [ "$B" = "ERROR" ] || [ "$M" = "ERROR" ]; then
-            echo "status=ERROR" >> $GITHUB_OUTPUT
-          elif [ "$B" = "PASS" ] && [ "$M" = "PASS" ]; then
-            echo "status=PASS"  >> $GITHUB_OUTPUT
-          else
-            echo "status=FAIL"  >> $GITHUB_OUTPUT
+          if   [ "$B" = "ERROR" ] || [ "$M" = "ERROR" ]; then echo "status=ERROR" >> $GITHUB_OUTPUT
+          elif [ "$B" = "PASS"  ] && [ "$M" = "PASS"  ]; then echo "status=PASS"  >> $GITHUB_OUTPUT
+          else echo "status=FAIL" >> $GITHUB_OUTPUT
           fi
 
-      # ── UPLOAD ARTIFACTS ────────────────────────────────────────────────
+      # ── UPLOAD ARTIFACTS ─────────────────────────────────────────────
       - name: Upload HTML Reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -266,7 +219,7 @@ jobs:
             reports/stress/results.jtl
           retention-days: 14
 
-      # ── CONSOLE SUMMARY ─────────────────────────────────────────────────
+      # ── CONSOLE SUMMARY ──────────────────────────────────────────────
       - name: Print Test Summary
         if: always()
         run: |
@@ -276,9 +229,74 @@ jobs:
           echo "╠══════════════════════════════════════════════════╣"
           echo "  Run #${{ github.run_number }} | ${{ github.ref_name }} | ${{ github.actor }}"
           echo "╠══════════════════════════════════════════════════╣"
-          echo "  Baseline (50)  → Samples: ${{ steps.baseline.outputs.samples }} | Errors: ${{ steps.baseline.outputs.errors }} (${{ steps.baseline.outputs.error_pct }}%) | Avg: ${{ steps.baseline.outputs.avg_rt }}ms | ${{ steps.baseline.outputs.status }}"
-          echo "  Medium  (150)  → Samples: ${{ steps.medium.outputs.samples }} | Errors: ${{ steps.medium.outputs.errors }} (${{ steps.medium.outputs.error_pct }}%) | Avg: ${{ steps.medium.outputs.avg_rt }}ms | ${{ steps.medium.outputs.status }}"
-          echo "  Stress  (500)  → Samples: ${{ steps.stress.outputs.samples }} | Errors: ${{ steps.stress.outputs.errors }} (${{ steps.stress.outputs.error_pct }}%) | Avg: ${{ steps.stress.outputs.avg_rt }}ms | ${{ steps.stress.outputs.status }}"
+          echo "  Baseline (50)  → ${{ steps.baseline.outputs.samples }} samples | ${{ steps.baseline.outputs.errors }} errors (${{ steps.baseline.outputs.error_pct }}%) | ${{ steps.baseline.outputs.avg_rt }}ms avg | ${{ steps.baseline.outputs.status }}"
+          echo "  Medium  (150)  → ${{ steps.medium.outputs.samples }} samples | ${{ steps.medium.outputs.errors }} errors (${{ steps.medium.outputs.error_pct }}%) | ${{ steps.medium.outputs.avg_rt }}ms avg | ${{ steps.medium.outputs.status }}"
+          echo "  Stress  (500)  → ${{ steps.stress.outputs.samples }} samples | ${{ steps.stress.outputs.errors }} errors (${{ steps.stress.outputs.error_pct }}%) | ${{ steps.stress.outputs.avg_rt }}ms avg | ${{ steps.stress.outputs.status }}"
           echo "╠══════════════════════════════════════════════════╣"
           echo "  OVERALL: ${{ steps.overall.outputs.status }}"
           echo "╚══════════════════════════════════════════════════╝"
+
+  # ── CALL SLACK NOTIFICATION WORKFLOW ──────────────────────────────────
+  slack:
+    needs: performance-test
+    if: always()
+    uses: ./.github/workflows/slack_notification.yml
+    with:
+      overall_status:   ${{ needs.performance-test.outputs.overall_status }}
+      run_number:       ${{ github.run_number }}
+      run_url:          ${{ needs.performance-test.outputs.run_url }}
+      branch:           ${{ github.ref_name }}
+      actor:            ${{ github.actor }}
+      repo:             ${{ github.repository }}
+      baseline_samples: ${{ needs.performance-test.outputs.baseline_samples }}
+      baseline_errors:  ${{ needs.performance-test.outputs.baseline_errors }}
+      baseline_error_pct: ${{ needs.performance-test.outputs.baseline_error_pct }}
+      baseline_avg_rt:  ${{ needs.performance-test.outputs.baseline_avg_rt }}
+      baseline_p90:     ${{ needs.performance-test.outputs.baseline_p90 }}
+      baseline_status:  ${{ needs.performance-test.outputs.baseline_status }}
+      medium_samples:   ${{ needs.performance-test.outputs.medium_samples }}
+      medium_errors:    ${{ needs.performance-test.outputs.medium_errors }}
+      medium_error_pct: ${{ needs.performance-test.outputs.medium_error_pct }}
+      medium_avg_rt:    ${{ needs.performance-test.outputs.medium_avg_rt }}
+      medium_status:    ${{ needs.performance-test.outputs.medium_status }}
+      stress_samples:   ${{ needs.performance-test.outputs.stress_samples }}
+      stress_errors:    ${{ needs.performance-test.outputs.stress_errors }}
+      stress_error_pct: ${{ needs.performance-test.outputs.stress_error_pct }}
+      stress_avg_rt:    ${{ needs.performance-test.outputs.stress_avg_rt }}
+      stress_status:    ${{ needs.performance-test.outputs.stress_status }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ── CALL EMAIL NOTIFICATION WORKFLOW ──────────────────────────────────
+  email:
+    needs: performance-test
+    if: always()
+    uses: ./.github/workflows/email_notification.yml
+    with:
+      overall_status:   ${{ needs.performance-test.outputs.overall_status }}
+      run_number:       ${{ github.run_number }}
+      run_url:          ${{ needs.performance-test.outputs.run_url }}
+      run_date:         ${{ needs.performance-test.outputs.run_date }}
+      branch:           ${{ github.ref_name }}
+      actor:            ${{ github.actor }}
+      repo:             ${{ github.repository }}
+      baseline_samples: ${{ needs.performance-test.outputs.baseline_samples }}
+      baseline_errors:  ${{ needs.performance-test.outputs.baseline_errors }}
+      baseline_error_pct: ${{ needs.performance-test.outputs.baseline_error_pct }}
+      baseline_avg_rt:  ${{ needs.performance-test.outputs.baseline_avg_rt }}
+      baseline_p90:     ${{ needs.performance-test.outputs.baseline_p90 }}
+      baseline_status:  ${{ needs.performance-test.outputs.baseline_status }}
+      medium_samples:   ${{ needs.performance-test.outputs.medium_samples }}
+      medium_errors:    ${{ needs.performance-test.outputs.medium_errors }}
+      medium_error_pct: ${{ needs.performance-test.outputs.medium_error_pct }}
+      medium_avg_rt:    ${{ needs.performance-test.outputs.medium_avg_rt }}
+      medium_status:    ${{ needs.performance-test.outputs.medium_status }}
+      stress_samples:   ${{ needs.performance-test.outputs.stress_samples }}
+      stress_errors:    ${{ needs.performance-test.outputs.stress_errors }}
+      stress_error_pct: ${{ needs.performance-test.outputs.stress_error_pct }}
+      stress_avg_rt:    ${{ needs.performance-test.outputs.stress_avg_rt }}
+      stress_status:    ${{ needs.performance-test.outputs.stress_status }}
+    secrets:
+      GMAIL_USERNAME:     ${{ secrets.GMAIL_USERNAME }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      NOTIFY_EMAIL:       ${{ secrets.NOTIFY_EMAIL }}
