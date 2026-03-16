@@ -11,7 +11,28 @@ jobs:
   performance-test:
     runs-on: ubuntu-latest
 
+    outputs:
+      baseline_samples: ${{ steps.baseline_stats.outputs.samples }}
+      baseline_errors: ${{ steps.baseline_stats.outputs.errors }}
+      baseline_error_pct: ${{ steps.baseline_stats.outputs.error_pct }}
+      baseline_avg_rt: ${{ steps.baseline_stats.outputs.avg_rt }}
+      baseline_p90: ${{ steps.baseline_stats.outputs.p90 }}
+      baseline_status: ${{ steps.baseline_stats.outputs.status }}
+      medium_samples: ${{ steps.medium_stats.outputs.samples }}
+      medium_errors: ${{ steps.medium_stats.outputs.errors }}
+      medium_error_pct: ${{ steps.medium_stats.outputs.error_pct }}
+      medium_avg_rt: ${{ steps.medium_stats.outputs.avg_rt }}
+      medium_status: ${{ steps.medium_stats.outputs.status }}
+      stress_samples: ${{ steps.stress_stats.outputs.samples }}
+      stress_errors: ${{ steps.stress_stats.outputs.errors }}
+      stress_error_pct: ${{ steps.stress_stats.outputs.error_pct }}
+      stress_avg_rt: ${{ steps.stress_stats.outputs.avg_rt }}
+      stress_status: ${{ steps.stress_stats.outputs.status }}
+      overall_status: ${{ steps.overall.outputs.status }}
+      run_url: ${{ steps.run_info.outputs.url }}
+
     steps:
+      # ─── SETUP ────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -21,19 +42,27 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Download Apache JMeter
+      - name: Capture run info
+        id: run_info
+        run: |
+          echo "url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+          echo "date=$(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
+      - name: Download Apache JMeter 5.6.3
         run: |
           wget -q https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz
           tar -xzf apache-jmeter-5.6.3.tgz
-          echo "JMeter downloaded and extracted"
+          echo "JMeter 5.6.3 ready"
 
       - name: Create reports directories
         run: |
           mkdir -p reports/baseline/html
           mkdir -p reports/medium/html
+          mkdir -p reports/peak/html
           mkdir -p reports/stress/html
           mkdir -p reports/endurance/html
 
+      # ─── BASELINE TEST (50 users) ─────────────────────────────────────
       - name: Run Baseline Test (50 users)
         run: |
           apache-jmeter-5.6.3/bin/jmeter \
@@ -44,32 +73,504 @@ jobs:
             -Jjmeter.save.saveservice.output_format=csv
         continue-on-error: true
 
-      - name: Upload Baseline HTML Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: baseline-html-report
-          path: reports/baseline/html/
-          retention-days: 7
-        if: always()
-
-      - name: Upload Baseline JTL Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: baseline-jtl-results
-          path: reports/baseline/results.jtl
-          retention-days: 7
-        if: always()
-
-      - name: Print Test Summary
+      - name: Parse Baseline Stats
+        id: baseline_stats
         run: |
-          echo "=============================="
-          echo "PERFORMANCE TEST SUMMARY"
-          echo "=============================="
           if [ -f reports/baseline/results.jtl ]; then
-            echo "Baseline results file: FOUND"
-            echo "Total lines in results: $(wc -l < reports/baseline/results.jtl)"
+            SAMPLES=$(tail -n +2 reports/baseline/results.jtl | wc -l)
+            ERRORS=$(tail -n +2 reports/baseline/results.jtl | awk -F',' '{if($8=="false") count++} END{print count+0}')
+            if [ "$SAMPLES" -gt 0 ]; then
+              ERROR_PCT=$(echo "scale=2; $ERRORS * 100 / $SAMPLES" | bc)
+              AVG_RT=$(tail -n +2 reports/baseline/results.jtl | awk -F',' '{sum+=$2; count++} END{printf "%.0f", sum/count}')
+              P90=$(tail -n +2 reports/baseline/results.jtl | awk -F',' '{print $2}' | sort -n | awk -v p=90 'BEGIN{n=0} {lines[n++]=$1} END{print lines[int(n*p/100)]}')
+            else
+              ERROR_PCT="N/A"; AVG_RT="N/A"; P90="N/A"
+            fi
+            if (( $(echo "$ERROR_PCT < 1" | bc -l) )) && (( $(echo "$AVG_RT < 2000" | bc -l) )); then
+              STATUS="PASS"
+            else
+              STATUS="FAIL"
+            fi
           else
-            echo "Baseline results file: NOT FOUND"
+            SAMPLES=0; ERRORS=0; ERROR_PCT="N/A"; AVG_RT="N/A"; P90="N/A"; STATUS="ERROR"
           fi
-          echo "=============================="
+          echo "samples=$SAMPLES" >> $GITHUB_OUTPUT
+          echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+          echo "error_pct=$ERROR_PCT" >> $GITHUB_OUTPUT
+          echo "avg_rt=$AVG_RT" >> $GITHUB_OUTPUT
+          echo "p90=$P90" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      # ─── MEDIUM LOAD TEST (150 users) ────────────────────────────────
+      - name: Enable TG2 - Disable TG1 in JMX
+        run: |
+          sed -i 's/testname="TG1 - Light Load (50 Users - Baseline)" enabled="true"/testname="TG1 - Light Load (50 Users - Baseline)" enabled="false"/' Demoblaze_Performance_Test.jmx
+          sed -i 's/testname="TG2 - Medium Load (150 Users)" enabled="false"/testname="TG2 - Medium Load (150 Users)" enabled="true"/' Demoblaze_Performance_Test.jmx
+
+      - name: Run Medium Load Test (150 users)
+        run: |
+          apache-jmeter-5.6.3/bin/jmeter \
+            -n \
+            -t Demoblaze_Performance_Test.jmx \
+            -l reports/medium/results.jtl \
+            -e -o reports/medium/html \
+            -Jjmeter.save.saveservice.output_format=csv
+        continue-on-error: true
+
+      - name: Parse Medium Stats
+        id: medium_stats
+        run: |
+          if [ -f reports/medium/results.jtl ]; then
+            SAMPLES=$(tail -n +2 reports/medium/results.jtl | wc -l)
+            ERRORS=$(tail -n +2 reports/medium/results.jtl | awk -F',' '{if($8=="false") count++} END{print count+0}')
+            if [ "$SAMPLES" -gt 0 ]; then
+              ERROR_PCT=$(echo "scale=2; $ERRORS * 100 / $SAMPLES" | bc)
+              AVG_RT=$(tail -n +2 reports/medium/results.jtl | awk -F',' '{sum+=$2; count++} END{printf "%.0f", sum/count}')
+            else
+              ERROR_PCT="N/A"; AVG_RT="N/A"
+            fi
+            if (( $(echo "$ERROR_PCT < 1" | bc -l) )) && (( $(echo "$AVG_RT < 2000" | bc -l) )); then
+              STATUS="PASS"
+            else
+              STATUS="FAIL"
+            fi
+          else
+            SAMPLES=0; ERRORS=0; ERROR_PCT="N/A"; AVG_RT="N/A"; STATUS="ERROR"
+          fi
+          echo "samples=$SAMPLES" >> $GITHUB_OUTPUT
+          echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+          echo "error_pct=$ERROR_PCT" >> $GITHUB_OUTPUT
+          echo "avg_rt=$AVG_RT" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      # ─── STRESS TEST (500 users) ──────────────────────────────────────
+      - name: Enable TG4 - Disable TG2 in JMX
+        run: |
+          sed -i 's/testname="TG2 - Medium Load (150 Users)" enabled="true"/testname="TG2 - Medium Load (150 Users)" enabled="false"/' Demoblaze_Performance_Test.jmx
+          sed -i 's/testname="TG4 - Stress Test (500 Users)" enabled="false"/testname="TG4 - Stress Test (500 Users)" enabled="true"/' Demoblaze_Performance_Test.jmx
+
+      - name: Run Stress Test (500 users)
+        run: |
+          apache-jmeter-5.6.3/bin/jmeter \
+            -n \
+            -t Demoblaze_Performance_Test.jmx \
+            -l reports/stress/results.jtl \
+            -e -o reports/stress/html \
+            -Jjmeter.save.saveservice.output_format=csv
+        continue-on-error: true
+
+      - name: Parse Stress Stats
+        id: stress_stats
+        run: |
+          if [ -f reports/stress/results.jtl ]; then
+            SAMPLES=$(tail -n +2 reports/stress/results.jtl | wc -l)
+            ERRORS=$(tail -n +2 reports/stress/results.jtl | awk -F',' '{if($8=="false") count++} END{print count+0}')
+            if [ "$SAMPLES" -gt 0 ]; then
+              ERROR_PCT=$(echo "scale=2; $ERRORS * 100 / $SAMPLES" | bc)
+              AVG_RT=$(tail -n +2 reports/stress/results.jtl | awk -F',' '{sum+=$2; count++} END{printf "%.0f", sum/count}')
+            else
+              ERROR_PCT="N/A"; AVG_RT="N/A"
+            fi
+            if (( $(echo "$ERROR_PCT < 1" | bc -l) )) && (( $(echo "$AVG_RT < 2000" | bc -l) )); then
+              STATUS="PASS"
+            else
+              STATUS="FAIL"
+            fi
+          else
+            SAMPLES=0; ERRORS=0; ERROR_PCT="N/A"; AVG_RT="N/A"; STATUS="ERROR"
+          fi
+          echo "samples=$SAMPLES" >> $GITHUB_OUTPUT
+          echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+          echo "error_pct=$ERROR_PCT" >> $GITHUB_OUTPUT
+          echo "avg_rt=$AVG_RT" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      # ─── OVERALL STATUS ───────────────────────────────────────────────
+      - name: Determine Overall Status
+        id: overall
+        run: |
+          B="${{ steps.baseline_stats.outputs.status }}"
+          M="${{ steps.medium_stats.outputs.status }}"
+          S="${{ steps.stress_stats.outputs.status }}"
+          if [ "$B" = "PASS" ] && [ "$M" = "PASS" ]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=FAIL" >> $GITHUB_OUTPUT
+          fi
+
+      # ─── UPLOAD ARTIFACTS ─────────────────────────────────────────────
+      - name: Upload All HTML Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmeter-html-reports
+          path: reports/
+          retention-days: 7
         if: always()
+
+      - name: Upload All JTL Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmeter-jtl-results
+          path: |
+            reports/baseline/results.jtl
+            reports/medium/results.jtl
+            reports/stress/results.jtl
+          retention-days: 7
+        if: always()
+
+  # ─── SLACK NOTIFICATION ─────────────────────────────────────────────
+  notify-slack:
+    needs: performance-test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Send Slack Notification
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          OVERALL: ${{ needs.performance-test.outputs.overall_status }}
+          RUN_URL: ${{ needs.performance-test.outputs.run_url }}
+          B_SAMPLES: ${{ needs.performance-test.outputs.baseline_samples }}
+          B_ERRORS: ${{ needs.performance-test.outputs.baseline_errors }}
+          B_ERROR_PCT: ${{ needs.performance-test.outputs.baseline_error_pct }}
+          B_AVG_RT: ${{ needs.performance-test.outputs.baseline_avg_rt }}
+          B_P90: ${{ needs.performance-test.outputs.baseline_p90 }}
+          B_STATUS: ${{ needs.performance-test.outputs.baseline_status }}
+          M_SAMPLES: ${{ needs.performance-test.outputs.medium_samples }}
+          M_ERRORS: ${{ needs.performance-test.outputs.medium_errors }}
+          M_ERROR_PCT: ${{ needs.performance-test.outputs.medium_error_pct }}
+          M_AVG_RT: ${{ needs.performance-test.outputs.medium_avg_rt }}
+          M_STATUS: ${{ needs.performance-test.outputs.medium_status }}
+          S_SAMPLES: ${{ needs.performance-test.outputs.stress_samples }}
+          S_ERRORS: ${{ needs.performance-test.outputs.stress_errors }}
+          S_ERROR_PCT: ${{ needs.performance-test.outputs.stress_error_pct }}
+          S_AVG_RT: ${{ needs.performance-test.outputs.stress_avg_rt }}
+          S_STATUS: ${{ needs.performance-test.outputs.stress_status }}
+        run: |
+          if [ "$OVERALL" = "PASS" ]; then
+            COLOUR="good"
+            ICON=":white_check_mark:"
+            TITLE="Performance Tests Passed"
+          else
+            COLOUR="danger"
+            ICON=":x:"
+            TITLE="Performance Tests Failed"
+          fi
+
+          b_icon=$([ "$B_STATUS" = "PASS" ] && echo ":white_check_mark:" || echo ":x:")
+          m_icon=$([ "$M_STATUS" = "PASS" ] && echo ":white_check_mark:" || echo ":x:")
+          s_icon=$([ "$S_STATUS" = "PASS" ] && echo ":white_check_mark:" || echo ":x:")
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "attachments": [
+              {
+                "color": "$COLOUR",
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "$ICON  DemoBlaze — $TITLE"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                      { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" },
+                      { "type": "mrkdwn", "text": "*Triggered By:*\n${{ github.actor }}" },
+                      { "type": "mrkdwn", "text": "*Run Number:*\n#${{ github.run_number }}" }
+                    ]
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*Test Results Summary*"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": "*Phase*" },
+                      { "type": "mrkdwn", "text": "*Samples*" },
+                      { "type": "mrkdwn", "text": "*Errors*" },
+                      { "type": "mrkdwn", "text": "*Avg RT*" }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": "$b_icon Baseline (50 users)" },
+                      { "type": "mrkdwn", "text": "$B_SAMPLES" },
+                      { "type": "mrkdwn", "text": "$B_ERRORS ($B_ERROR_PCT%)" },
+                      { "type": "mrkdwn", "text": "${B_AVG_RT}ms" }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": "$m_icon Medium Load (150 users)" },
+                      { "type": "mrkdwn", "text": "$M_SAMPLES" },
+                      { "type": "mrkdwn", "text": "$M_ERRORS ($M_ERROR_PCT%)" },
+                      { "type": "mrkdwn", "text": "${M_AVG_RT}ms" }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      { "type": "mrkdwn", "text": "$s_icon Stress Test (500 users)" },
+                      { "type": "mrkdwn", "text": "$S_SAMPLES" },
+                      { "type": "mrkdwn", "text": "$S_ERRORS ($S_ERROR_PCT%)" },
+                      { "type": "mrkdwn", "text": "${S_AVG_RT}ms" }
+                    ]
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "actions",
+                    "elements": [
+                      {
+                        "type": "button",
+                        "text": { "type": "plain_text", "text": "View Full Reports" },
+                        "style": "primary",
+                        "url": "$RUN_URL"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -s -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK"
+
+  # ─── EMAIL NOTIFICATION ───────────────────────────────────────────────
+  notify-email:
+    needs: performance-test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Send Email Notification
+        env:
+          OVERALL: ${{ needs.performance-test.outputs.overall_status }}
+          RUN_URL: ${{ needs.performance-test.outputs.run_url }}
+          B_SAMPLES: ${{ needs.performance-test.outputs.baseline_samples }}
+          B_ERRORS: ${{ needs.performance-test.outputs.baseline_errors }}
+          B_ERROR_PCT: ${{ needs.performance-test.outputs.baseline_error_pct }}
+          B_AVG_RT: ${{ needs.performance-test.outputs.baseline_avg_rt }}
+          B_P90: ${{ needs.performance-test.outputs.baseline_p90 }}
+          B_STATUS: ${{ needs.performance-test.outputs.baseline_status }}
+          M_SAMPLES: ${{ needs.performance-test.outputs.medium_samples }}
+          M_ERRORS: ${{ needs.performance-test.outputs.medium_errors }}
+          M_ERROR_PCT: ${{ needs.performance-test.outputs.medium_error_pct }}
+          M_AVG_RT: ${{ needs.performance-test.outputs.medium_avg_rt }}
+          M_STATUS: ${{ needs.performance-test.outputs.medium_status }}
+          S_SAMPLES: ${{ needs.performance-test.outputs.stress_samples }}
+          S_ERRORS: ${{ needs.performance-test.outputs.stress_errors }}
+          S_ERROR_PCT: ${{ needs.performance-test.outputs.stress_error_pct }}
+          S_AVG_RT: ${{ needs.performance-test.outputs.stress_avg_rt }}
+          S_STATUS: ${{ needs.performance-test.outputs.stress_status }}
+        run: |
+          pip install secure-smtplib 2>/dev/null || true
+
+          if [ "$OVERALL" = "PASS" ]; then
+            HEADER_COLOR="#1a7f37"
+            BADGE_COLOR="#1a7f37"
+            BADGE_TEXT="ALL TESTS PASSED"
+            STATUS_ICON="✅"
+            SUBJECT="✅ JMeter Performance Report — Run #${{ github.run_number }} PASSED"
+          else
+            HEADER_COLOR="#cf222e"
+            BADGE_COLOR="#cf222e"
+            BADGE_TEXT="TESTS FAILED"
+            STATUS_ICON="❌"
+            SUBJECT="❌ JMeter Performance Report — Run #${{ github.run_number }} FAILED"
+          fi
+
+          b_badge=$([ "$B_STATUS" = "PASS" ] && echo '<span style="background:#1a7f37;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">PASS</span>' || echo '<span style="background:#cf222e;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">FAIL</span>')
+          m_badge=$([ "$M_STATUS" = "PASS" ] && echo '<span style="background:#1a7f37;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">PASS</span>' || echo '<span style="background:#cf222e;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">FAIL</span>')
+          s_badge=$([ "$S_STATUS" = "PASS" ] && echo '<span style="background:#1a7f37;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">PASS</span>' || echo '<span style="background:#9a6700;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">EXPECTED</span>')
+
+          cat > email.html << HTMLEOF
+          <!DOCTYPE html>
+          <html>
+          <head><meta charset="UTF-8"></head>
+          <body style="margin:0;padding:0;background:#f6f8fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8fa;padding:32px 0;">
+              <tr><td align="center">
+                <table width="620" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;border:1px solid #d0d7de;overflow:hidden;">
+
+                  <!-- HEADER -->
+                  <tr>
+                    <td style="background:$HEADER_COLOR;padding:24px 32px;">
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td>
+                            <p style="margin:0;color:#ffffff;font-size:13px;opacity:0.85;">PERFORMANCE TESTING</p>
+                            <h1 style="margin:4px 0 0;color:#ffffff;font-size:22px;font-weight:700;">DemoBlaze Performance Report</h1>
+                          </td>
+                          <td align="right">
+                            <span style="background:rgba(255,255,255,0.2);color:#ffffff;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;">Run #${{ github.run_number }}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- OVERALL STATUS BADGE -->
+                  <tr>
+                    <td style="padding:24px 32px 0;border-bottom:1px solid #d0d7de;">
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding-bottom:20px;">
+                            <p style="margin:0 0 8px;font-size:13px;color:#57606a;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Overall Result</p>
+                            <span style="background:$BADGE_COLOR;color:#fff;padding:6px 20px;border-radius:20px;font-size:14px;font-weight:700;letter-spacing:0.5px;">$STATUS_ICON &nbsp; $BADGE_TEXT</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding-bottom:20px;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td width="33%" style="padding-right:8px;">
+                                  <div style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;padding:12px 16px;">
+                                    <p style="margin:0 0 4px;font-size:11px;color:#57606a;text-transform:uppercase;letter-spacing:0.5px;">Repository</p>
+                                    <p style="margin:0;font-size:13px;color:#24292f;font-weight:600;">${{ github.repository }}</p>
+                                  </div>
+                                </td>
+                                <td width="33%" style="padding-right:8px;">
+                                  <div style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;padding:12px 16px;">
+                                    <p style="margin:0 0 4px;font-size:11px;color:#57606a;text-transform:uppercase;letter-spacing:0.5px;">Branch</p>
+                                    <p style="margin:0;font-size:13px;color:#24292f;font-weight:600;">${{ github.ref_name }}</p>
+                                  </div>
+                                </td>
+                                <td width="33%">
+                                  <div style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;padding:12px 16px;">
+                                    <p style="margin:0 0 4px;font-size:11px;color:#57606a;text-transform:uppercase;letter-spacing:0.5px;">Triggered By</p>
+                                    <p style="margin:0;font-size:13px;color:#24292f;font-weight:600;">${{ github.actor }}</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- RESULTS TABLE -->
+                  <tr>
+                    <td style="padding:24px 32px;">
+                      <p style="margin:0 0 16px;font-size:15px;font-weight:700;color:#24292f;">Test Results Summary</p>
+                      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #d0d7de;border-radius:6px;overflow:hidden;font-size:13px;">
+                        <!-- Table Header -->
+                        <tr style="background:#f6f8fa;">
+                          <th style="padding:10px 14px;text-align:left;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">TEST PHASE</th>
+                          <th style="padding:10px 14px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">USERS</th>
+                          <th style="padding:10px 14px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">SAMPLES</th>
+                          <th style="padding:10px 14px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">ERRORS</th>
+                          <th style="padding:10px 14px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">ERROR %</th>
+                          <th style="padding:10px 14px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">AVG RT</th>
+                          <th style="padding:10px 14px;text-align:center;font-weight:600;color:#57606a;border-bottom:1px solid #d0d7de;font-size:12px;">STATUS</th>
+                        </tr>
+                        <!-- Baseline Row -->
+                        <tr>
+                          <td style="padding:12px 14px;color:#24292f;font-weight:600;border-bottom:1px solid #d0d7de;">Baseline</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">50</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">$B_SAMPLES</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">$B_ERRORS</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">$B_ERROR_PCT%</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">${B_AVG_RT}ms</td>
+                          <td style="padding:12px 14px;text-align:center;border-bottom:1px solid #d0d7de;">$b_badge</td>
+                        </tr>
+                        <!-- Medium Row -->
+                        <tr style="background:#f6f8fa;">
+                          <td style="padding:12px 14px;color:#24292f;font-weight:600;border-bottom:1px solid #d0d7de;">Load (Medium)</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">150</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">$M_SAMPLES</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">$M_ERRORS</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">$M_ERROR_PCT%</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;border-bottom:1px solid #d0d7de;">${M_AVG_RT}ms</td>
+                          <td style="padding:12px 14px;text-align:center;border-bottom:1px solid #d0d7de;">$m_badge</td>
+                        </tr>
+                        <!-- Stress Row -->
+                        <tr>
+                          <td style="padding:12px 14px;color:#24292f;font-weight:600;">Stress Test</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;">500</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;">$S_SAMPLES</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;">$S_ERRORS</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;">$S_ERROR_PCT%</td>
+                          <td style="padding:12px 14px;text-align:center;color:#57606a;">${S_AVG_RT}ms</td>
+                          <td style="padding:12px 14px;text-align:center;">$s_badge</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- SLA REFERENCE -->
+                  <tr>
+                    <td style="padding:0 32px 24px;">
+                      <div style="background:#dff7e9;border:1px solid #a7f3c1;border-radius:6px;padding:12px 16px;">
+                        <p style="margin:0;font-size:12px;color:#1a7f37;"><strong>SLA Thresholds:</strong> &nbsp; Average Response Time &lt; 2,000ms &nbsp;|&nbsp; Error Rate &lt; 1% &nbsp;|&nbsp; Stress test failures are expected and documented as findings</p>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- CTA BUTTON -->
+                  <tr>
+                    <td style="padding:0 32px 32px;" align="center">
+                      <a href="$RUN_URL" style="display:inline-block;background:#0969da;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">View Full HTML Reports →</a>
+                    </td>
+                  </tr>
+
+                  <!-- FOOTER -->
+                  <tr>
+                    <td style="background:#f6f8fa;padding:16px 32px;border-top:1px solid #d0d7de;">
+                      <p style="margin:0;font-size:12px;color:#57606a;text-align:center;">This report was automatically generated by GitHub Actions &nbsp;·&nbsp; JMeter 5.6.3 &nbsp;·&nbsp; DemoBlaze Performance Suite</p>
+                    </td>
+                  </tr>
+
+                </table>
+              </td></tr>
+            </table>
+          </body>
+          </html>
+          HTMLEOF
+
+          python3 << PYEOF
+          import smtplib
+          from email.mime.multipart import MIMEMultipart
+          from email.mime.text import MIMEText
+          import os
+
+          sender = os.environ['GMAIL_USERNAME']
+          recipient = os.environ['NOTIFY_EMAIL']
+          password = os.environ['GMAIL_APP_PASSWORD']
+          subject = os.environ['SUBJECT']
+
+          with open('email.html', 'r') as f:
+              html_body = f.read()
+
+          msg = MIMEMultipart('alternative')
+          msg['Subject'] = subject
+          msg['From'] = f"JMeter CI <{sender}>"
+          msg['To'] = recipient
+          msg.attach(MIMEText(html_body, 'html'))
+
+          with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+              server.login(sender, password)
+              server.sendmail(sender, recipient, msg.as_string())
+              print(f"Email sent to {recipient}")
+          PYEOF
+        env:
+          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+          SUBJECT: "${{ needs.performance-test.outputs.overall_status == 'PASS' && '✅ JMeter Performance Report — Run #' || '❌ JMeter Performance Report — Run #' }}${{ github.run_number }}${{ needs.performance-test.outputs.overall_status == 'PASS' && ' PASSED' || ' FAILED' }}"
