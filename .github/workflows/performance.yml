@@ -77,6 +77,15 @@ jobs:
           mkdir -p reports/stress/html
           mkdir -p reports/endurance/html
 
+      - name: Clean All Previous Results
+        run: |
+          for phase in baseline medium peak stress endurance; do
+            rm -f reports/$phase/results.jtl
+            rm -rf reports/$phase/html
+            mkdir -p reports/$phase/html
+          done
+          echo "All previous results cleared."
+
       - name: Verify JMX File Exists
         run: |
           if [ ! -f "Demoblaze_Performance_Test.jmx" ]; then
@@ -150,6 +159,8 @@ jobs:
 
       - name: "Run Medium Load Test — TG2 (150 Users)"
         run: |
+          rm -f reports/medium/results.jtl
+          rm -rf reports/medium/html && mkdir -p reports/medium/html
           jmeter -n \
             -t Demoblaze_Performance_Test.jmx \
             -l reports/medium/results.jtl \
@@ -171,6 +182,8 @@ jobs:
 
       - name: "Run Peak Load Test — TG3 (300 Users)"
         run: |
+          rm -f reports/peak/results.jtl
+          rm -rf reports/peak/html && mkdir -p reports/peak/html
           jmeter -n \
             -t Demoblaze_Performance_Test.jmx \
             -l reports/peak/results.jtl \
@@ -192,6 +205,8 @@ jobs:
 
       - name: "Run Stress Test — TG4 (500 Users)"
         run: |
+          rm -f reports/stress/results.jtl
+          rm -rf reports/stress/html && mkdir -p reports/stress/html
           jmeter -n \
             -t Demoblaze_Performance_Test.jmx \
             -l reports/stress/results.jtl \
@@ -213,6 +228,8 @@ jobs:
 
       - name: "Run Endurance Test — TG5 (100 Users / 30 min)"
         run: |
+          rm -f reports/endurance/results.jtl
+          rm -rf reports/endurance/html && mkdir -p reports/endurance/html
           jmeter -n \
             -t Demoblaze_Performance_Test.jmx \
             -l reports/endurance/results.jtl \
